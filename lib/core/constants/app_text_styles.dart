@@ -138,32 +138,4 @@ class AppTextStyles {
         color: AppColors.linkBlue,
         decoration: TextDecoration.underline,
       );
-
-  static TextStyle get authTitle => cabinBoldTitleDark28;
-  static TextStyle get authSubtitle => cabinRegularSubtitleDark16;
-  static TextStyle get fieldLabel => cabinRegularTextMuted14;
-  static TextStyle get fieldInput => cabinSemiBoldTextPrimary17;
-  static TextStyle get fieldHint => cabinRegularTextMuted16;
-  static TextStyle get countryCode => cabinRegularCountryCodeDark16;
-  static TextStyle get buttonText => cabinBoldTextWhite18;
-  static TextStyle get buttonContinue => cabinBoldTextWhite18;
-  static TextStyle get buttonPrimary => cabinBoldTextWhite18;
-  static TextStyle get buttonOutlined => cabinBoldPrimaryNavy18;
-  static TextStyle get alertHeader => cabinBoldBlack18;
-  static TextStyle get alertSubtitle => cabinRegularBlack16;
-  static TextStyle get bottomSheetTitle => cabinSemiBoldBlack22;
-  static TextStyle get bottomSheetBtnNo => cabinMediumBlack18;
-  static TextStyle get bottomSheetBtnYes => cabinBoldTextWhite18;
-  static TextStyle get timerDigits => cabinSemiBoldBlack42;
-  static TextStyle get timerSubtitle => cabinRegularPrimaryNavy18;
-  static TextStyle get timerLabel => cabinRegularPrimaryNavy18;
-  static TextStyle get heading1 => cabinExtraBoldTextPrimary24;
-  static TextStyle get heading2 => cabinBoldTextPrimary18;
-  static TextStyle get subtitle => cabinRegularTextSecondary14;
-  static TextStyle get subtitleSmall => cabinRegularTextSecondary13;
-  static TextStyle get body => cabinMediumTextPrimary15;
-  static TextStyle get inputLabel => cabinSemiBoldTextPrimary14;
-  static TextStyle get inputText => cabinMediumTextPrimary15;
-  static TextStyle get inputHint => cabinRegularTextMuted14;
-  static TextStyle get link => cabinBoldLinkBlue15;
 }
