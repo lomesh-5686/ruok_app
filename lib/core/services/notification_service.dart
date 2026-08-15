@@ -1,12 +1,18 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../constants/app_constants.dart';
 import '../constants/app_strings.dart';
+import '../routes/app_routes.dart';
 
 class NotificationService {
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  Future<void> init() async {
+  void Function(String? payload)? onNotificationTap;
+
+  Future<void> init(
+      {void Function(String? payload)? onSelectNotification}) async {
+    onNotificationTap = onSelectNotification;
+
     const AndroidInitializationSettings androidInitializationSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -26,11 +32,10 @@ class NotificationService {
     await _notificationsPlugin.initialize(
       settings: initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // Handled when user taps the notification
+        onNotificationTap?.call(response.payload);
       },
     );
 
-    // Create High Importance Notification Channel for Android
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
       AppConstants.notificationChannelId,
       AppConstants.notificationChannelName,
@@ -47,13 +52,32 @@ class NotificationService {
     await androidPlugin?.createNotificationChannel(channel);
   }
 
+  Future<String?> getNotificationLaunchRoute() async {
+    final NotificationAppLaunchDetails? details =
+        await _notificationsPlugin.getNotificationAppLaunchDetails();
+    if (details != null && details.didNotificationLaunchApp) {
+      final String? payload = details.notificationResponse?.payload;
+      if (payload != null && payload.isNotEmpty) {
+        return payload;
+      }
+      return AppRoutes.alertResponse;
+    }
+    return null;
+  }
+
   Future<bool> requestPermissions() async {
     final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
         _notificationsPlugin.resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>();
 
-    final bool? androidGranted =
-        await androidPlugin?.requestNotificationsPermission();
+    if (androidPlugin != null) {
+      final bool? granted =
+          await androidPlugin.requestNotificationsPermission();
+      if (granted == null || granted == true) {
+        return true;
+      }
+      return false;
+    }
 
     final IOSFlutterLocalNotificationsPlugin? iosPlugin =
         _notificationsPlugin.resolvePlatformSpecificImplementation<
@@ -65,7 +89,19 @@ class NotificationService {
       sound: true,
     );
 
-    return (androidGranted ?? false) || (iosGranted ?? false);
+    return iosGranted ?? false;
+  }
+
+  Future<bool> areNotificationsEnabled() async {
+    final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+        _notificationsPlugin.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+
+    if (androidPlugin != null) {
+      final bool? enabled = await androidPlugin.areNotificationsEnabled();
+      return enabled ?? true;
+    }
+    return true;
   }
 
   Future<void> showShiftEndNotification() async {
@@ -75,10 +111,14 @@ class NotificationService {
       AppConstants.notificationChannelName,
       channelDescription: AppConstants.notificationChannelDescription,
       importance: Importance.max,
-      priority: Priority.high,
+      priority: Priority.max,
       ticker: 'ticker',
       playSound: true,
       enableVibration: true,
+      visibility: NotificationVisibility.public,
+      category: AndroidNotificationCategory.alarm,
+      autoCancel: true,
+      fullScreenIntent: false,
     );
 
     const NotificationDetails notificationDetails = NotificationDetails(
@@ -95,6 +135,7 @@ class NotificationService {
       title: AppStrings.notif1Title,
       body: AppStrings.notif1Body,
       notificationDetails: notificationDetails,
+      payload: AppRoutes.alertResponse,
     );
   }
 
@@ -105,9 +146,13 @@ class NotificationService {
       AppConstants.notificationChannelName,
       channelDescription: AppConstants.notificationChannelDescription,
       importance: Importance.max,
-      priority: Priority.high,
+      priority: Priority.max,
       playSound: true,
       enableVibration: true,
+      visibility: NotificationVisibility.public,
+      category: AndroidNotificationCategory.alarm,
+      autoCancel: true,
+      fullScreenIntent: false,
     );
 
     const NotificationDetails notificationDetails = NotificationDetails(
@@ -124,6 +169,7 @@ class NotificationService {
       title: AppStrings.notif2Title,
       body: AppStrings.notif2Body,
       notificationDetails: notificationDetails,
+      payload: AppRoutes.incidentInfo,
     );
   }
 

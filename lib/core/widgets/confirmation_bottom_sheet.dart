@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_screenutil_plus/flutter_screenutil_plus.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_strings.dart';
 import '../constants/app_text_styles.dart';
+import 'custom_button.dart';
 
-class ConfirmationBottomSheet extends StatelessWidget {
+class ConfirmationBottomSheet extends StatefulWidget {
   final String title;
   final String? subtitle;
   final String confirmText;
@@ -57,128 +58,115 @@ class ConfirmationBottomSheet extends StatelessWidget {
   }
 
   @override
+  State<ConfirmationBottomSheet> createState() =>
+      _ConfirmationBottomSheetState();
+}
+
+class _ConfirmationBottomSheetState extends State<ConfirmationBottomSheet> {
+  bool _isConfirmLoading = false;
+  bool _isCancelLoading = false;
+
+  @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.vertical(
-          top: Radius.circular(16.r),
+          top: Radius.circular(20.r),
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.black.withValues(alpha: 0.19),
-            blurRadius: 9,
-            offset: const Offset(0, 4),
+            color: AppColors.black.withValues(alpha: 0.12),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Home Indicator Drag Handle (width: 48px, height: 6px, radius: 3px, #000000 at 0.1 opacity)
-            Container(
-              width: 48.w,
-              height: 6.h,
-              decoration: BoxDecoration(
-                color: AppColors.black.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(3.r),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 48.w,
+            height: 6.h,
+            decoration: BoxDecoration(
+              color: AppColors.black.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(3.r),
+            ),
+          ),
+          SizedBox(height: 20.h),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: 320.w),
+            child: Text(
+              widget.title,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.cabinSemiBoldBlack22.copyWith(
+                fontSize: widget.title.length > 40 ? 18.sp : 22.sp,
               ),
             ),
-            SizedBox(height: 24.h),
-
-            // Title: Multiline or single-line prompt
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 320.w),
-              child: Text(
-                title,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.bottomSheetTitle.copyWith(
-                  fontSize: title.length > 40 ? 18.sp : 22.sp,
-                  height: title.length > 40 ? 25 / 18 : 27 / 22,
+          ),
+          if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+            SizedBox(height: 12.h),
+            Text(
+              widget.subtitle!,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.cabinRegularTextSecondary14,
+            ),
+          ],
+          SizedBox(height: 20.h),
+          Row(
+            children: [
+              Expanded(
+                child: CustomButton(
+                  text: widget.cancelText,
+                  height: 56.h,
+                  borderRadius: 12.r,
+                  isLoading: _isCancelLoading,
+                  backgroundColor: AppColors.bottomSheetGreyBtn,
+                  textStyle: AppTextStyles.cabinMediumBlack18,
+                  onPressed: () {
+                    if (_isConfirmLoading || _isCancelLoading) return;
+                    setState(() {
+                      _isCancelLoading = true;
+                    });
+                    if (widget.onCancel != null) {
+                      widget.onCancel!();
+                    } else {
+                      Navigator.of(context).pop(false);
+                    }
+                  },
                 ),
               ),
-            ),
-
-            if (subtitle != null && subtitle!.isNotEmpty) ...[
-              SizedBox(height: 12.h),
-              Text(
-                subtitle!,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.subtitle,
+              SizedBox(width: 15.w),
+              Expanded(
+                child: CustomButton(
+                  text: widget.confirmText,
+                  height: 56.h,
+                  borderRadius: 12.r,
+                  isLoading: _isConfirmLoading,
+                  backgroundColor: widget.confirmButtonColor,
+                  textStyle: AppTextStyles.cabinBoldTextWhite18,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.black.withValues(alpha: 0.08),
+                      blurRadius: 4,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                  onPressed: () {
+                    if (_isConfirmLoading || _isCancelLoading) return;
+                    setState(() {
+                      _isConfirmLoading = true;
+                    });
+                    widget.onConfirm();
+                  },
+                ),
               ),
             ],
-
-            SizedBox(height: 28.h),
-
-            // Action Buttons Row: No (Frame 3) and Yes (Frame 2)
-            Row(
-              children: [
-                // "No" Button (width: 160px, height: 56px, background: #EEEEEE, radius: 12px)
-                Expanded(
-                  child: SizedBox(
-                    height: 56.h,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (onCancel != null) {
-                          onCancel!();
-                        } else {
-                          Navigator.of(context).pop(false);
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.bottomSheetGreyBtn,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                      ),
-                      child: Text(
-                        cancelText,
-                        style: AppTextStyles.bottomSheetBtnNo,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 15.w),
-
-                // "Yes" Button (width: 160px, height: 56px, background: #0050A0, radius: 12px, shadow)
-                Expanded(
-                  child: Container(
-                    height: 56.h,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12.r),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.black.withValues(alpha: 0.08),
-                          blurRadius: 4,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ElevatedButton(
-                      onPressed: onConfirm,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: confirmButtonColor,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                      ),
-                      child: Text(
-                        confirmText,
-                        style: AppTextStyles.bottomSheetBtnYes,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 16.h),
-          ],
-        ),
+          ),
+          SizedBox(height: 16.h),
+        ],
       ),
     );
   }

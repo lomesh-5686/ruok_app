@@ -1,30 +1,42 @@
-import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_screenutil_plus/flutter_screenutil_plus.dart';
 import '../../core/constants/app_assets.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/database/local_storage.dart';
-import '../auth/cubit/auth_cubit.dart';
-import '../auth/screens/login_screen.dart';
-import '../safety/cubit/safety_cubit.dart';
-import '../safety/screens/alert_idle_screen.dart';
-import '../safety/screens/alert_response_screen.dart';
-import '../safety/screens/incident_info_screen.dart';
-import '../safety/screens/shift_timer_screen.dart';
-import '../../injection_container.dart' as di;
+import '../../core/routes/app_routes.dart';
+import '../../core/widgets/ru_ok_logo.dart';
+import 'bloc/splash_bloc.dart';
+import 'bloc/splash_event.dart';
+import 'bloc/splash_state.dart';
+import 'widgets/splash_glow_orb.dart';
+import 'widgets/splash_curve_widget.dart';
 
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+class SplashScreen extends StatelessWidget {
+  final LocalStorage? localStorage;
+
+  const SplashScreen({super.key, this.localStorage});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  Widget build(BuildContext context) {
+    return BlocProvider<SplashBloc>(
+      create: (context) => SplashBloc(
+        localStorage: localStorage ?? LocalStorage(),
+      )..add(const SplashStartedEvent()),
+      child: const _SplashScreenView(),
+    );
+  }
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenView extends StatefulWidget {
+  const _SplashScreenView();
+
+  @override
+  State<_SplashScreenView> createState() => _SplashScreenViewState();
+}
+
+class _SplashScreenViewState extends State<_SplashScreenView>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
@@ -48,7 +60,6 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _animController.forward();
-    _handleRouting();
   }
 
   @override
@@ -57,180 +68,100 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
-  Future<void> _handleRouting() async {
-    await Future.delayed(const Duration(milliseconds: 2000));
-    if (!mounted) return;
-
-    final LocalStorage localStorage = di.sl<LocalStorage>();
-    final bool isLoggedIn = localStorage.isLoggedIn();
-
-    if (!isLoggedIn) {
-      context.read<AuthCubit>().checkAuthStatus();
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-    } else {
-      // Restore safety state from Hive delta
-      final safetyCubit = context.read<SafetyCubit>();
-      await safetyCubit.initSafetyState();
-
-      if (!mounted) return;
-      final String status = localStorage.getSafetyStatus();
-
-      Widget targetScreen;
-      switch (status) {
-        case AppConstants.statusShiftRunning:
-          targetScreen = const ShiftTimerScreen();
-          break;
-        case AppConstants.statusAlertRunning:
-          targetScreen = const AlertResponseScreen();
-          break;
-        case AppConstants.statusInTrouble:
-          targetScreen = const IncidentInfoScreen();
-          break;
-        case AppConstants.statusIdle:
-        default:
-          targetScreen = const AlertIdleScreen();
-          break;
-      }
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => targetScreen),
-      );
+  void _onStateListener(BuildContext context, SplashState state) {
+    if (state is SplashNavigateToLoginState) {
+      Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+    } else if (state is SplashNavigateToIdleState) {
+      Navigator.of(context).pushReplacementNamed(AppRoutes.alertIdle);
+    } else if (state is SplashNavigateToShiftTimerState) {
+      Navigator.of(context).pushReplacementNamed(AppRoutes.shiftTimer);
+    } else if (state is SplashNavigateToAlertResponseState) {
+      Navigator.of(context).pushReplacementNamed(AppRoutes.alertResponse);
+    } else if (state is SplashNavigateToIncidentInfoState) {
+      Navigator.of(context).pushReplacementNamed(AppRoutes.incidentInfo);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.splashBackground,
-      body: Stack(
-        children: [
-          // 1. Top-Left Soft Sky Blue Light Orb
-          Positioned(
-            left: -90.w,
-            top: -90.h,
-            child: _buildGlowOrb(
+    return BlocListener<SplashBloc, SplashState>(
+      listener: _onStateListener,
+      child: Scaffold(
+        backgroundColor: AppColors.splashBackground,
+        body: Stack(
+          children: [
+            SplashGlowOrb(
+              left: -90.w,
+              top: -90.h,
               color: AppColors.orbSkyBlue.withValues(alpha: 0.70),
               size: 280.r,
             ),
-          ),
-
-          // 2. Top-Right Soft Warm Golden Light Orb
-          Positioned(
-            right: -80.w,
-            top: -80.h,
-            child: _buildGlowOrb(
+            SplashGlowOrb(
+              right: -80.w,
+              top: -80.h,
               color: AppColors.orbWarmGold.withValues(alpha: 0.70),
               size: 280.r,
             ),
-          ),
-
-          // 3. Bottom-Left Soft Warm Golden Light Orb
-          Positioned(
-            left: -90.w,
-            bottom: -90.h,
-            child: _buildGlowOrb(
+            SplashGlowOrb(
+              left: -90.w,
+              bottom: -90.h,
               color: AppColors.orbWarmGold.withValues(alpha: 0.70),
               size: 290.r,
             ),
-          ),
-
-          // 4. Bottom-Right Soft Sky Blue Light Orb
-          Positioned(
-            right: -90.w,
-            bottom: -90.h,
-            child: _buildGlowOrb(
+            SplashGlowOrb(
+              right: -90.w,
+              bottom: -90.h,
               color: AppColors.orbSkyBlue.withValues(alpha: 0.70),
               size: 290.r,
             ),
-          ),
-
-          // Backdrop Blur Layer for authentic Figma mesh gradient blend
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
-              child: Container(color: Colors.transparent),
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80),
+                child: Container(color: Colors.transparent),
+              ),
             ),
-          ),
-
-          // 5. Official Figma Contour Lines (Exact CSS Dimensions & Positions)
-
-          // Line 1: Top-Left Upper Arc
-          Positioned(
-            left: 0.w,
-            top: 0.h,
-            child: SvgPicture.asset(
-              AppAssets.firstLine,
+            SplashCurveWidget(
+              left: 0.w,
+              top: 0.h,
+              asset: AppAssets.firstLine,
               width: 171.w,
               height: 98.h,
-              fit: BoxFit.fill,
             ),
-          ),
-
-          // Line 2: Second Line (Top Ribbon Loop)
-          Positioned(
-            left: -0.5.w,
-            top: 26.23.h,
-            child: SvgPicture.asset(
-              AppAssets.secondLine,
+            SplashCurveWidget(
+              left: -0.5.w,
+              top: 26.23.h,
+              asset: AppAssets.secondLine,
               width: 376.w,
               height: 164.85.h,
-              fit: BoxFit.fill,
             ),
-          ),
-
-          // Line 3: Third Line (Bottom S-Curve)
-          Positioned(
-            left: 0.w,
-            top: 546.6.h,
-            child: SvgPicture.asset(
-              AppAssets.thirdLine,
+            SplashCurveWidget(
+              left: 0.w,
+              bottom: 95.h,
+              asset: AppAssets.thirdLine,
               width: 376.w,
               height: 170.71.h,
-              fit: BoxFit.fill,
             ),
-          ),
-
-          // Line 4: Fourth Line (Bottom-Right Dome Hill)
-          Positioned(
-            left: 165.w,
-            top: 741.6.h,
-            child: SvgPicture.asset(
-              AppAssets.fourthLine,
+            SplashCurveWidget(
+              left: 165.w,
+              bottom: 0.h,
+              asset: AppAssets.fourthLine,
               width: 168.47.w,
               height: 70.4.h,
-              fit: BoxFit.fill,
             ),
-          ),
-
-          // 6. Centered Official Figma Shield Logo (app_logo.svg)
-          Center(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: ScaleTransition(
-                scale: _scaleAnimation,
-                child: SvgPicture.asset(
-                  AppAssets.appLogo,
-                  width: 165.w,
-                  height: 195.h,
-                  fit: BoxFit.contain,
+            Center(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: ScaleTransition(
+                  scale: _scaleAnimation,
+                  child: RuOkLogo(
+                    width: 165.w,
+                    height: 195.h,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGlowOrb({required Color color, required double size}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
+          ],
+        ),
       ),
     );
   }

@@ -19,7 +19,6 @@ class LocalStorage {
     return _box!;
   }
 
-  // --- Auth Session ---
   bool isLoggedIn() {
     return box.get(AppConstants.keyIsLoggedIn, defaultValue: false) as bool;
   }
@@ -43,7 +42,6 @@ class LocalStorage {
     await box.clear();
   }
 
-  // --- Safety Status ---
   String getSafetyStatus() {
     return box.get(AppConstants.keySafetyStatus, defaultValue: AppConstants.statusIdle) as String;
   }
@@ -52,7 +50,6 @@ class LocalStorage {
     await box.put(AppConstants.keySafetyStatus, status);
   }
 
-  // --- Shift Timestamps ---
   int? getShiftEndTime() {
     return box.get(AppConstants.keyShiftEndTime) as int?;
   }
@@ -65,7 +62,6 @@ class LocalStorage {
     await box.delete(AppConstants.keyShiftEndTime);
   }
 
-  // --- Alert Timestamps ---
   int? getAlertEndTime() {
     return box.get(AppConstants.keyAlertEndTime) as int?;
   }
@@ -78,24 +74,51 @@ class LocalStorage {
     await box.delete(AppConstants.keyAlertEndTime);
   }
 
-  // --- Incident Data ---
-  Future<void> saveIncidentData({
-    required int timestamp,
-    required double latitude,
-    required double longitude,
-  }) async {
-    await box.put(AppConstants.keyIncidentTimestamp, timestamp);
-    await box.put(AppConstants.keyIncidentLatitude, latitude);
-    await box.put(AppConstants.keyIncidentLongitude, longitude);
+  Future<void> saveLastKnownLocation(double latitude, double longitude) async {
+    await box.put(AppConstants.keyLastKnownLatitude, latitude);
+    await box.put(AppConstants.keyLastKnownLongitude, longitude);
   }
 
-  int? getIncidentTimestamp() => box.get(AppConstants.keyIncidentTimestamp) as int?;
-  double? getIncidentLatitude() => box.get(AppConstants.keyIncidentLatitude) as double?;
-  double? getIncidentLongitude() => box.get(AppConstants.keyIncidentLongitude) as double?;
+  double? getLastKnownLatitude() =>
+      box.get(AppConstants.keyLastKnownLatitude) as double?;
+  double? getLastKnownLongitude() =>
+      box.get(AppConstants.keyLastKnownLongitude) as double?;
+
+  Future<void> saveIncidentData({
+    required int timestamp,
+    double? latitude,
+    double? longitude,
+  }) async {
+    await box.put(AppConstants.keyIncidentTimestamp, timestamp);
+    if (latitude != null) {
+      await box.put(AppConstants.keyIncidentLatitude, latitude);
+      await box.put(AppConstants.keyLastKnownLatitude, latitude);
+    }
+    if (longitude != null) {
+      await box.put(AppConstants.keyIncidentLongitude, longitude);
+      await box.put(AppConstants.keyLastKnownLongitude, longitude);
+    }
+  }
+
+  int? getIncidentTimestamp() =>
+      box.get(AppConstants.keyIncidentTimestamp) as int?;
+  double? getIncidentLatitude() =>
+      (box.get(AppConstants.keyIncidentLatitude) as double?) ??
+      getLastKnownLatitude();
+  double? getIncidentLongitude() =>
+      (box.get(AppConstants.keyIncidentLongitude) as double?) ??
+      getLastKnownLongitude();
+
+  Future<void> clearIncidentData() async {
+    await box.delete(AppConstants.keyIncidentTimestamp);
+    await box.delete(AppConstants.keyIncidentLatitude);
+    await box.delete(AppConstants.keyIncidentLongitude);
+  }
 
   Future<void> resetToIdle() async {
     await setSafetyStatus(AppConstants.statusIdle);
     await clearShiftEndTime();
     await clearAlertEndTime();
+    await clearIncidentData();
   }
 }

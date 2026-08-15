@@ -13,20 +13,16 @@ Future<void> shiftEndAlarmCallback() async {
       box.get(AppConstants.keySafetyStatus, defaultValue: AppConstants.statusIdle) as String;
 
   if (currentStatus == AppConstants.statusShiftRunning) {
-    // 1. Transition state to ALERT_RUNNING
     await box.put(AppConstants.keySafetyStatus, AppConstants.statusAlertRunning);
 
-    // 2. Set alert end timestamp
     final int alertEndTime =
         DateTime.now().millisecondsSinceEpoch + (AppConstants.alertDurationSeconds * 1000);
     await box.put(AppConstants.keyAlertEndTime, alertEndTime);
 
-    // 3. Trigger Notification #1
     final NotificationService notificationService = NotificationService();
     await notificationService.init();
     await notificationService.showShiftEndNotification();
 
-    // 4. Schedule Alarm #2 for Alert End (5 minutes)
     await AndroidAlarmManager.oneShot(
       const Duration(seconds: AppConstants.alertDurationSeconds),
       AppConstants.alertAlarmId,
@@ -48,22 +44,30 @@ Future<void> alertEndAlarmCallback() async {
       box.get(AppConstants.keySafetyStatus, defaultValue: AppConstants.statusIdle) as String;
 
   if (currentStatus == AppConstants.statusAlertRunning) {
-    // 1. Transition state to IN_TROUBLE
     await box.put(AppConstants.keySafetyStatus, AppConstants.statusInTrouble);
 
-    // 2. Capture GPS Coordinates
-    double latitude = 37.7749; // Default fallback (San Francisco)
-    double longitude = -122.4194;
+    final int nowMs = DateTime.now().millisecondsSinceEpoch;
+    await box.put(AppConstants.keyIncidentTimestamp, nowMs);
+
+    final NotificationService notificationService = NotificationService();
+    await notificationService.init();
+    await notificationService.showAlertEndNotification();
+
+    double? latitude;
+    double? longitude;
     try {
       final Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 4),
+        ),
       );
       latitude = position.latitude;
       longitude = position.longitude;
     } catch (_) {
       try {
-        final Position? lastPosition = await Geolocator.getLastKnownPosition();
+        final Position? lastPosition =
+            await Geolocator.getLastKnownPosition();
         if (lastPosition != null) {
           latitude = lastPosition.latitude;
           longitude = lastPosition.longitude;
@@ -71,15 +75,16 @@ Future<void> alertEndAlarmCallback() async {
       } catch (_) {}
     }
 
-    // 3. Save incident data to Hive
-    final int nowMs = DateTime.now().millisecondsSinceEpoch;
-    await box.put(AppConstants.keyIncidentTimestamp, nowMs);
-    await box.put(AppConstants.keyIncidentLatitude, latitude);
-    await box.put(AppConstants.keyIncidentLongitude, longitude);
+    latitude ??= box.get(AppConstants.keyLastKnownLatitude) as double?;
+    longitude ??= box.get(AppConstants.keyLastKnownLongitude) as double?;
 
-    // 4. Trigger Notification #2
-    final NotificationService notificationService = NotificationService();
-    await notificationService.init();
-    await notificationService.showAlertEndNotification();
+    if (latitude != null) {
+      await box.put(AppConstants.keyIncidentLatitude, latitude);
+      await box.put(AppConstants.keyLastKnownLatitude, latitude);
+    }
+    if (longitude != null) {
+      await box.put(AppConstants.keyIncidentLongitude, longitude);
+      await box.put(AppConstants.keyLastKnownLongitude, longitude);
+    }
   }
 }

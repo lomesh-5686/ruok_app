@@ -3,7 +3,6 @@ import 'package:ruok_app_practical_task/main.dart';
 
 void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
-    // Tests that RuOkApp widget instantiates correctly
     expect(const RuOkApp(), isNotNull);
   });
 }

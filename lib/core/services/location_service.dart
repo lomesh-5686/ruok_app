@@ -2,12 +2,8 @@ import 'package:geolocator/geolocator.dart';
 
 class LocationService {
   Future<bool> checkAndRequestPermission() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return false;
-    }
-
     LocationPermission permission = await Geolocator.checkPermission();
+
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
       if (permission == LocationPermission.denied) {
@@ -19,26 +15,64 @@ class LocationService {
       return false;
     }
 
+    final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      await Geolocator.openLocationSettings();
+      return false;
+    }
+
     return true;
   }
 
-  Future<Position?> getCurrentPosition() async {
+  Future<Position?> getLastKnownPosition() async {
     try {
-      final bool hasPermission = await checkAndRequestPermission();
-      if (!hasPermission) {
-        return await Geolocator.getLastKnownPosition();
+      return await Geolocator.getLastKnownPosition();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Position?> getCurrentPosition() async {
+    Position? lastKnown;
+    try {
+      lastKnown = await Geolocator.getLastKnownPosition();
+    } catch (_) {}
+
+    try {
+      final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      LocationPermission permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
       }
 
-      return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
-    } catch (_) {
-      try {
-        return await Geolocator.getLastKnownPosition();
-      } catch (_) {
-        return null;
+      if (serviceEnabled &&
+          (permission == LocationPermission.whileInUse ||
+              permission == LocationPermission.always)) {
+        try {
+          final Position pos = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.medium,
+              timeLimit: Duration(seconds: 4),
+            ),
+          );
+          return pos;
+        } catch (_) {}
+
+        try {
+          final Position pos = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.low,
+              timeLimit: Duration(seconds: 3),
+            ),
+          );
+          return pos;
+        } catch (_) {}
       }
+
+      return lastKnown;
+    } catch (_) {
+      return lastKnown;
     }
   }
 }

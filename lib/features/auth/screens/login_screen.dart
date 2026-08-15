@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_screenutil_plus/flutter_screenutil_plus.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/routes/app_routes.dart';
 import '../../../core/widgets/custom_button.dart';
-import '../cubit/auth_cubit.dart';
-import '../cubit/auth_state.dart';
-import '../../safety/cubit/safety_cubit.dart';
-import '../../safety/screens/alert_idle_screen.dart';
+import '../../../core/widgets/custom_text_field.dart';
+import '../../safety/bloc/safety_bloc.dart';
+import '../../safety/bloc/safety_event.dart';
+import '../bloc/auth_bloc.dart';
+import '../bloc/auth_event.dart';
+import '../bloc/auth_state.dart';
+import '../models/country_code_model.dart';
+import '../widgets/auth_header_widget.dart';
+import '../widgets/country_picker_bottom_sheet.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,62 +26,32 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final FocusNode _nameFocusNode = FocusNode();
-  final FocusNode _phoneFocusNode = FocusNode();
+  late final TextEditingController _nameController;
+  late final TextEditingController _phoneController;
+  late final FocusNode _nameFocusNode;
+  late final FocusNode _phoneFocusNode;
 
-  String? _nameError;
-  String? _phoneError;
-
-  String _selectedCountryCode = '+0123';
-  final List<String> _countryCodes = [
-    '+0123',
-    '+91',
-    '+1',
-    '+44',
-    '+61',
-    '+971'
-  ];
+  List<CountryCodeModel> _countries = const [];
 
   @override
   void initState() {
     super.initState();
-    _nameFocusNode.addListener(() {
-      if (_nameFocusNode.hasFocus && _nameError != null) {
-        setState(() {
-          _nameError = null;
-        });
-      } else {
-        setState(() {});
-      }
-    });
+    final authState = context.read<AuthBloc>().state;
+    _nameController = TextEditingController(text: authState.name);
+    _phoneController = TextEditingController(text: authState.phone);
+    _nameFocusNode = FocusNode();
+    _phoneFocusNode = FocusNode();
 
-    _phoneFocusNode.addListener(() {
-      if (_phoneFocusNode.hasFocus && _phoneError != null) {
-        setState(() {
-          _phoneError = null;
-        });
-      } else {
-        setState(() {});
-      }
-    });
+    _loadCountries();
+  }
 
-    _nameController.addListener(() {
-      if (_nameError != null && _nameController.text.trim().isNotEmpty) {
-        setState(() {
-          _nameError = null;
-        });
-      }
-    });
-
-    _phoneController.addListener(() {
-      if (_phoneError != null && _phoneController.text.trim().length == 10) {
-        setState(() {
-          _phoneError = null;
-        });
-      }
-    });
+  Future<void> _loadCountries() async {
+    final list = await CountryCodeModel.loadFromAsset();
+    if (mounted) {
+      setState(() {
+        _countries = list;
+      });
+    }
   }
 
   @override
@@ -90,74 +65,65 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _onContinue() {
     FocusScope.of(context).unfocus();
+    context.read<AuthBloc>().add(const AuthSubmitEvent());
+  }
 
-    final String name = _nameController.text.trim();
-    final String phone = _phoneController.text.trim();
+  void _openCountryPicker(String currentCode) async {
+    FocusScope.of(context).unfocus();
+    final selected = await CountryPickerBottomSheet.show(
+      context,
+      countries: _countries,
+      selectedDialCode: currentCode,
+    );
+    if (selected != null && mounted) {
+      context
+          .read<AuthBloc>()
+          .add(AuthCountryCodeChangedEvent(selected.dialCode));
+    }
+  }
 
-    setState(() {
-      _nameError = name.isEmpty ? AppStrings.nameValidation : null;
-      _phoneError = phone.isEmpty
-          ? 'Please enter your mobile number'
-          : (phone.length < 10
-              ? 'Please enter a valid 10-digit mobile number'
-              : null);
-    });
-
-    if (_nameError != null || _phoneError != null) {
-      return;
+  Widget _buildCountryCodeSelector(String currentCode) {
+    for (final c in _countries) {
+      if (c.dialCode == currentCode) {
+        break;
+      }
     }
 
-    context.read<AuthCubit>().submitAuth(
-          name: name,
-          phone: phone,
-          countryCode: _selectedCountryCode,
-        );
+    return GestureDetector(
+      onTap: () => _openCountryPicker(currentCode),
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            currentCode,
+            style: AppTextStyles.cabinRegularCountryCodeDark16,
+          ),
+          SizedBox(width: 4.w),
+          Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: AppColors.subtitleDark,
+            size: 20.r,
+          ),
+          SizedBox(width: 12.w),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isNameFocused = _nameFocusNode.hasFocus;
-    final bool isPhoneFocused = _phoneFocusNode.hasFocus;
-
-    // Focus state gives yellow/gold (#FF9E00), unfocused with error gives red (#EF4444), default gives grey (#E0E0E0 / #82858A)
-    final Color nameBorderColor = isNameFocused
-        ? AppColors.accentGold
-        : (_nameError != null ? AppColors.timerRed : AppColors.inputBorder);
-
-    final Color nameIconColor = isNameFocused
-        ? AppColors.accentGold
-        : (_nameError != null ? AppColors.timerRed : AppColors.iconGrey);
-
-    final Color phoneBorderColor = isPhoneFocused
-        ? AppColors.accentGold
-        : (_phoneError != null ? AppColors.timerRed : AppColors.inputBorder);
-
-    final Color phoneIconColor = isPhoneFocused
-        ? AppColors.accentGold
-        : (_phoneError != null ? AppColors.timerRed : AppColors.iconGrey);
-
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: BlocConsumer<AuthCubit, AuthState>(
+      body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
-          if (state is Authenticated) {
-            context.read<SafetyCubit>().initSafetyState();
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const AlertIdleScreen()),
-            );
-          } else if (state is AuthError) {
-            setState(() {
-              if (state.message.contains('name')) {
-                _nameError = state.message;
-              } else {
-                _phoneError = state.message;
-              }
-            });
+          if (state.isAuthenticated) {
+            context.read<SafetyBloc>().add(const InitSafetyStateEvent());
+            Navigator.of(context).pushReplacementNamed(AppRoutes.alertIdle);
           }
         },
         builder: (context, state) {
-          final bool isLoading = state is AuthLoading;
-
           return GestureDetector(
             onTap: () => FocusScope.of(context).unfocus(),
             child: SafeArea(
@@ -167,216 +133,45 @@ class _LoginScreenState extends State<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(height: 32.h),
-
-                    // App Icon (width: 114.17px, height: 136px)
-                    Center(
-                      child: SvgPicture.asset(
-                        AppAssets.appLogo,
-                        width: 114.17.w,
-                        height: 136.h,
-                        fit: BoxFit.contain,
-                      ),
+                    const AuthHeaderWidget(),
+                    SizedBox(height: 20.h),
+                    CustomTextField(
+                      iconAsset: AppAssets.profileCircle,
+                      label: AppStrings.nameLabel,
+                      hint: AppStrings.namePlaceholder,
+                      controller: _nameController,
+                      focusNode: _nameFocusNode,
+                      errorText: state.nameError,
+                      keyboardType: TextInputType.visiblePassword,
+                      textCapitalization: TextCapitalization.words,
+                      onChanged: (val) {
+                        context.read<AuthBloc>().add(AuthNameChangedEvent(val));
+                      },
                     ),
                     SizedBox(height: 20.h),
-
-                    // Title: Tell us about yourself
-                    Text(
-                      AppStrings.authTitle,
-                      style: AppTextStyles.authTitle,
+                    CustomTextField(
+                      iconAsset: AppAssets.call,
+                      hint: AppStrings.phonePlaceholder,
+                      controller: _phoneController,
+                      focusNode: _phoneFocusNode,
+                      errorText: state.phoneError,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(10),
+                      ],
+                      prefixWidget:
+                          _buildCountryCodeSelector(state.countryCode),
+                      onChanged: (val) {
+                        context
+                            .read<AuthBloc>()
+                            .add(AuthPhoneChangedEvent(val));
+                      },
                     ),
-                    SizedBox(height: 8.h),
-
-                    // Subtitle: Enter your name and phone number to continue.
-                    Text(
-                      AppStrings.authSubtitle,
-                      style: AppTextStyles.authSubtitle,
-                    ),
-                    SizedBox(height: 20.h),
-
-                    // --- FIELD 1: Name Field ---
-                    Container(
-                      padding: EdgeInsets.only(bottom: 8.h),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(
-                            color: nameBorderColor,
-                            width: (isNameFocused || _nameError != null)
-                                ? 1.8
-                                : 1.4,
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Profile Circle Icon
-                          SvgPicture.asset(
-                            AppAssets.profileCircle,
-                            width: 22.r,
-                            height: 22.r,
-                            colorFilter: ColorFilter.mode(
-                              nameIconColor,
-                              BlendMode.srcIn,
-                            ),
-                          ),
-                          SizedBox(width: 14.w),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  AppStrings.nameLabel,
-                                  style: AppTextStyles.fieldLabel.copyWith(
-                                    color: _nameError != null && !isNameFocused
-                                        ? AppColors.timerRed
-                                        : AppColors.textMuted,
-                                  ),
-                                ),
-                                SizedBox(height: 2.h),
-                                TextField(
-                                  controller: _nameController,
-                                  focusNode: _nameFocusNode,
-                                  keyboardType: TextInputType.visiblePassword,
-                                  textCapitalization: TextCapitalization.words,
-                                  autocorrect: false,
-                                  enableSuggestions: false,
-                                  spellCheckConfiguration:
-                                      const SpellCheckConfiguration.disabled(),
-                                  style: AppTextStyles.fieldInput.copyWith(
-                                    decoration: TextDecoration.none,
-                                    decorationColor: Colors.transparent,
-                                  ),
-                                  decoration: InputDecoration(
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                    border: InputBorder.none,
-                                    hintText: AppStrings.namePlaceholder,
-                                    hintStyle: AppTextStyles.fieldHint.copyWith(
-                                      decoration: TextDecoration.none,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (_nameError != null && !isNameFocused) ...[
-                      SizedBox(height: 4.h),
-                      Text(
-                        _nameError!,
-                        style: AppTextStyles.fieldLabel.copyWith(
-                          color: AppColors.timerRed,
-                          fontSize: 12.sp,
-                        ),
-                      ),
-                    ],
-                    SizedBox(height: 20.h),
-                    Container(
-                      padding: EdgeInsets.only(bottom: 8.h),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(
-                            color: phoneBorderColor,
-                            width: (isPhoneFocused || _phoneError != null)
-                                ? 1.8
-                                : 1.4,
-                          ),
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          // Call Icon
-                          SvgPicture.asset(
-                            AppAssets.call,
-                            width: 22.r,
-                            height: 22.r,
-                            colorFilter: ColorFilter.mode(
-                              phoneIconColor,
-                              BlendMode.srcIn,
-                            ),
-                          ),
-                          SizedBox(width: 14.w),
-                          DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: _selectedCountryCode,
-                              icon: Padding(
-                                padding: EdgeInsets.only(left: 4.w),
-                                child: Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  color: AppColors.subtitleDark,
-                                  size: 20.r,
-                                ),
-                              ),
-                              items: _countryCodes.map((code) {
-                                return DropdownMenuItem<String>(
-                                  value: code,
-                                  child: Text(
-                                    code,
-                                    style: AppTextStyles.countryCode,
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setState(() {
-                                    _selectedCountryCode = val;
-                                  });
-                                }
-                              },
-                            ),
-                          ),
-                          SizedBox(width: 12.w),
-                          Expanded(
-                            child: TextField(
-                              controller: _phoneController,
-                              focusNode: _phoneFocusNode,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(10),
-                              ],
-                              autocorrect: false,
-                              enableSuggestions: false,
-                              spellCheckConfiguration:
-                                  const SpellCheckConfiguration.disabled(),
-                              style: AppTextStyles.fieldInput.copyWith(
-                                decoration: TextDecoration.none,
-                                decorationColor: Colors.transparent,
-                              ),
-                              decoration: InputDecoration(
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
-                                border: InputBorder.none,
-                                hintText: AppStrings.phonePlaceholder,
-                                hintStyle: AppTextStyles.fieldHint.copyWith(
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (_phoneError != null && !isPhoneFocused) ...[
-                      SizedBox(height: 4.h),
-                      Text(
-                        _phoneError!,
-                        style: AppTextStyles.fieldLabel.copyWith(
-                          color: AppColors.timerRed,
-                          fontSize: 12.sp,
-                        ),
-                      ),
-                    ],
                     SizedBox(height: 30.h),
-
-                    // Continue Button
                     CustomButton(
                       text: AppStrings.btnContinue,
-                      isLoading: isLoading,
+                      isLoading: state.isSubmitting,
                       onPressed: _onContinue,
                     ),
                   ],

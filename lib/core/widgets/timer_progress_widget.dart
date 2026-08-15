@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_screenutil_plus/flutter_screenutil_plus.dart';
 import '../constants/app_assets.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_text_styles.dart';
@@ -38,12 +38,12 @@ class TimerProgressWidget extends StatelessWidget {
     final double strokeWidth = isAlertMode ? 16.23.r : 24.5.r;
 
     final TextStyle digitsStyle = isAlertMode
-        ? AppTextStyles.timerDigits.copyWith(fontSize: 28.sp, height: 34 / 28)
-        : AppTextStyles.timerDigits;
+        ? AppTextStyles.cabinSemiBoldBlack42.copyWith(fontSize: 28.sp)
+        : AppTextStyles.cabinSemiBoldBlack42;
 
     final TextStyle subStyle = isAlertMode
-        ? AppTextStyles.timerSubtitle.copyWith(fontSize: 13.sp, height: 16 / 13)
-        : AppTextStyles.timerSubtitle;
+        ? AppTextStyles.cabinRegularPrimaryNavy18.copyWith(fontSize: 13.sp)
+        : AppTextStyles.cabinRegularPrimaryNavy18;
 
     return Center(
       child: SizedBox(
@@ -52,12 +52,11 @@ class TimerProgressWidget extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // 1. Custom circular progress track (Ellipse 41: #ECECEC) and active radial gradient arc (Ellipse 42)
             SizedBox(
               width: outerDiameter,
               height: outerDiameter,
               child: CustomPaint(
-                painter: _FigmaTimerRingPainter(
+                painter: _TimerProgressRingPainter(
                   progress: progress,
                   isAlertMode: isAlertMode,
                   trackColor: AppColors.timerTrackGrey,
@@ -65,14 +64,12 @@ class TimerProgressWidget extends StatelessWidget {
                 ),
               ),
             ),
-
-            // 2. Inner Image Circle (Ellipse 43: #FAFAFA + inner texture)
             Container(
               width: innerDiameter,
               height: innerDiameter,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0xFFFAFAFA),
+                color: AppColors.timerInnerBackground,
               ),
               child: ClipOval(
                 child: Image.asset(
@@ -85,8 +82,6 @@ class TimerProgressWidget extends StatelessWidget {
                 ),
               ),
             ),
-
-            // 3. Center Text Content (Digits and Subtitle)
             Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -108,13 +103,13 @@ class TimerProgressWidget extends StatelessWidget {
   }
 }
 
-class _FigmaTimerRingPainter extends CustomPainter {
+class _TimerProgressRingPainter extends CustomPainter {
   final double progress;
   final bool isAlertMode;
   final Color trackColor;
   final double strokeWidth;
 
-  _FigmaTimerRingPainter({
+  _TimerProgressRingPainter({
     required this.progress,
     required this.isAlertMode,
     required this.trackColor,
@@ -127,7 +122,6 @@ class _FigmaTimerRingPainter extends CustomPainter {
     final double radius = (size.width - strokeWidth) / 2;
     final Rect rect = Rect.fromLTWH(0, 0, size.width, size.height);
 
-    // 1. Draw Background Track (Ellipse 41: #ECECEC)
     final Paint trackPaint = Paint()
       ..color = trackColor
       ..style = PaintingStyle.stroke
@@ -136,7 +130,6 @@ class _FigmaTimerRingPainter extends CustomPainter {
 
     canvas.drawCircle(center, radius, trackPaint);
 
-    // 2. Draw Active Progress Arc (Ellipse 42: radial-gradient(100% 100% at 142.5% 13.75%, #FFFFFF 0%, ... 100%) rotated -90deg)
     if (progress > 0) {
       final RadialGradient gradient = isAlertMode
           ? AppColors.timerRedGradient
@@ -148,7 +141,6 @@ class _FigmaTimerRingPainter extends CustomPainter {
         ..strokeWidth = strokeWidth
         ..strokeCap = StrokeCap.round;
 
-      // Start from top (-90 degrees / -pi/2) and sweep clockwise
       final double sweepAngle = 2 * math.pi * progress;
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius),
@@ -161,7 +153,7 @@ class _FigmaTimerRingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _FigmaTimerRingPainter oldDelegate) {
+  bool shouldRepaint(covariant _TimerProgressRingPainter oldDelegate) {
     return oldDelegate.progress != progress ||
         oldDelegate.isAlertMode != isAlertMode ||
         oldDelegate.trackColor != trackColor ||
